@@ -12,14 +12,28 @@ const HEADERS = {
 }
 
 async function api(method, path, body = null) {
+  const isGet = method === 'GET' || method === 'DELETE'
+  
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: HEADERS,
-    body: body ? JSON.stringify(body) : null,
+    headers: {
+      'Authorization': `PVEAPIToken=${tokenId}=${tokenSecret}`,
+      ...(!isGet && body ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
+    },
+    body: body && !isGet ? new URLSearchParams(body).toString() : null,
     agent,
   })
-  const json = await res.json()
-  if (!res.ok) throw new Error(json.errors || json.message || res.statusText)
+
+  const text = await res.text()
+  
+  let json
+  try {
+    json = JSON.parse(text)
+  } catch {
+    throw new Error(`Proxmox returned non-JSON: ${text}`)
+  }
+
+  if (!res.ok) throw new Error(JSON.stringify(json.errors) || json.message || res.statusText)
   return json.data
 }
 

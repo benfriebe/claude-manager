@@ -1,14 +1,21 @@
 import { spawn } from 'node-pty'
-import config from '../config.js'
+import * as proxmox from './proxmox.js'
 
-const activeSessions = new Map()
+export async function handleTerminalSocket(ws, vmid) {
+  // Get the container's IP directly
+  const ip = await proxmox.getContainerIP(vmid)
+  if (!ip) {
+    ws.send(JSON.stringify({ type: 'output', data: 'Could not get container IP\r\n' }))
+    ws.close()
+    return
+  }
 
-export function handleTerminalSocket(ws, vmid) {
-  const { node } = config.proxmox
-  
-  // We exec into the container via pct exec — this runs on the Proxmox host
-  // The WebUI container needs SSH access to the Proxmox host, or run on it directly
-  const pty = spawn('pct', ['exec', String(vmid), '--', 'bash', '-c',
+  const pty = spawn('ssh', [
+    '-tt',                        // force TTY
+    '-o', 'StrictHostKeyChecking=no',
+    '-o', 'UserKnownHostsFile=/dev/null',
+    '-i', '/root/.ssh/id_rsa',   // key from webui container to target containers
+    `root@${ip}`,
     'tmux new-session -A -s main'
   ], {
     name: 'xterm-256color',
@@ -17,19 +24,11 @@ export function handleTerminalSocket(ws, vmid) {
     env: process.env,
   })
 
-  const sessionKey = `${vmid}-${Date.now()}`
-  activeSessions.set(sessionKey, pty)
-
   pty.onData(data => {
-    if (ws.readyState === ws.OPEN) {
-      ws.send(JSON.stringify({ type: 'output', data }))
-    }
+    if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type: 'output', data }))
   })
 
-  pty.onExit(() => {
-    ws.close()
-    activeSessions.delete(sessionKey)
-  })
+  pty.onExit(() => ws.close())
 
   ws.on('message', raw => {
     try {
@@ -39,8 +38,5 @@ export function handleTerminalSocket(ws, vmid) {
     } catch {}
   })
 
-  ws.on('close', () => {
-    pty.kill()
-    activeSessions.delete(sessionKey)
-  })
+  ws.on('close', () => pty.kill())
 }
