@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Agent Manager</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 12px 20px;
+      background: #1a1d27;
+      border-bottom: 1px solid #2d3148;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    h1 { font-size: 16px; font-weight: 600; color: #a78bfa; }
+    
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 280px;
+      background: #1a1d27;
+      border-right: 1px solid #2d3148;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    @media (max-width: 600px) {
+      .sidebar { width: 100%; }
+      .sidebar.hidden-mobile { display: none; }
+      .terminal-pane.hidden-mobile { display: none; }
+    }
+
+    .sidebar-header {
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #2d3148;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #64748b;
+    }
+
+    .session-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .session-card {
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 4px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s;
+    }
+
+    .session-card:hover { background: #252837; }
+    .session-card.active { background: #252837; border-color: #7c3aed; }
+
+    .session-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .session-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: #e2e8f0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-dot.running { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+    .status-dot.stopped { background: #475569; }
+
+    .session-meta {
+      font-size: 11px;
+      color: #64748b;
+      display: flex;
+      gap: 8px;
+    }
+
+    .session-actions {
+      display: flex;
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    /* Buttons */
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 10px;
+      transition: all 0.15s;
+    }
+
+    .btn-primary {
+      background: #7c3aed;
+      color: white;
+    }
+    .btn-primary:hover { background: #6d28d9; }
+
+    .btn-ghost {
+      background: transparent;
+      color: #94a3b8;
+      border: 1px solid #2d3148;
+    }
+    .btn-ghost:hover { background: #252837; color: #e2e8f0; }
+
+    .btn-danger {
+      background: transparent;
+      color: #f87171;
+      border: 1px solid #2d3148;
+    }
+    .btn-danger:hover { background: #451a1a; }
+
+    .btn-sm { padding: 3px 8px; font-size: 11px; }
+
+    /* Terminal pane */
+    .terminal-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #0d1117;
+    }
+
+    .terminal-toolbar {
+      padding: 8px 16px;
+      background: #1a1d27;
+      border-bottom: 1px solid #2d3148;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .terminal-title {
+      font-size: 13px;
+      color: #94a3b8;
+      flex: 1;
+    }
+
+    #terminal-container {
+      flex: 1;
+      overflow: hidden;
+      padding: 4px;
+    }
+
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: #475569;
+    }
+
+    .empty-state svg { opacity: 0.3; }
+    .empty-state p { font-size: 14px; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-overlay.hidden { display: none; }
+
+    .modal {
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      padding: 24px;
+      width: min(380px, 90vw);
+    }
+
+    .modal h2 { font-size: 16px; margin-bottom: 16px; }
+
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px; }
+    .field input {
+      width: 100%;
+      padding: 8px 12px;
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-size: 14px;
+    }
+    .field input:focus {
+      outline: none;
+      border-color: #7c3aed;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+
+    /* Snapshots panel */
+    .snapshot-list { margin-top: 8px; }
+    .snapshot-item {
+      padding: 6px 8px;
+      background: #0f1117;
+      border-radius: 6px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+      z-index: 200;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.2s;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.error { border-color: #f87171; color: #f87171; }
+    .toast.success { border-color: #22c55e; color: #22c55e; }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #2d3148; border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⬡ Claude Agent Manager</h1>
+  <div class="header-actions">
+    <button class="btn-primary" onclick="openCreateModal()">+ New Session</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span>Sessions</span>
+      <span id="session-count" style="color:#64748b">—</span>
+    </div>
+    <div class="session-list" id="session-list">
+      <div style="padding:20px;text-align:center;color:#475569;font-size:13px">Loading...</div>
+    </div>
+  </div>
+
+  <div class="terminal-pane" id="terminal-pane">
+    <div class="empty-state" id="empty-state">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="2" y="3" width="20" height="14" rx="2"/>
+        <path d="M8 21h8M12 17v4"/>
+        <path d="M7 8l3 3-3 3M13 14h4"/>
+      </svg>
+      <p>Select a session to open terminal</p>
+    </div>
+
+    <div id="active-terminal" style="display:none;height:100%;flex-direction:column;display:none">
+      <div class="terminal-toolbar">
+        <span class="terminal-title" id="terminal-title">—</span>
+        <button class="btn-ghost btn-sm" onclick="openSnapshotModal()">📸 Snapshot</button>
+        <button class="btn-ghost btn-sm" id="back-btn" onclick="showSidebar()" style="display:none">← Back</button>
+      </div>
+      <div id="terminal-container"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Create session modal -->
+<div class="modal-overlay hidden" id="create-modal">
+  <div class="modal">
+    <h2>New Agent Session</h2>
+    <div class="field">
+      <label>Session name</label>
+      <input type="text" id="new-session-name" placeholder="e.g. api-refactor" 
+             pattern="[a-z0-9-]+" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('create-modal')">Cancel</button>
+      <button class="btn-primary" onclick="createSession()">Create & Start</button>
+    </div>
+  </div>
+</div>
+
+<!-- Snapshot modal -->
+<div class="modal-overlay hidden" id="snapshot-modal">
+  <div class="modal">
+    <h2>Snapshots</h2>
+    <div class="field">
+      <label>New snapshot name</label>
+      <input type="text" id="snap-name" placeholder="e.g. pre-refactor" />
+    </div>
+    <div class="field">
+      <label>Description (optional)</label>
+      <input type="text" id="snap-desc" placeholder="Before major changes" />
+    </div>
+    <button class="btn-primary btn-sm" onclick="createSnapshot()" style="margin-bottom:16px">
+      Create Snapshot
+    </button>
+    <div id="snapshot-list" class="snapshot-list"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('snapshot-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/addon-fit/xterm-addon-fit.min.js"></script>
+<script src="client.js"></script>
+</body>
+</html>
