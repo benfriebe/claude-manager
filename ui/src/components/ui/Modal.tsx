@@ -32,8 +32,8 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="w-[min(420px,90vw)] border border-border-bright bg-bg-elevated p-6">
-        <h2 className="mb-4 text-sm font-semibold text-neon-green">
+      <div className="w-[min(420px,90vw)] border border-border-bright bg-bg-elevated p-2">
+        <h2 className="mb-2 text-sm font-semibold text-neon-green">
           {'> '}{title}
         </h2>
         {children}

@@ -58,28 +58,30 @@ export function SnapshotModal({
         <label className="mb-1 block text-[11px] text-text-secondary">
           snapshot name
         </label>
-        <div className="mb-2 flex items-center border border-border bg-bg-primary px-3 py-2 focus-within:border-neon-green/50">
-          <span className="mr-2 text-neon-green text-xs">{'>'}</span>
+        <div className="mb-2 flex items-baseline border border-border bg-bg-primary px-3 py-2 focus-within:border-neon-green/50">
+          <span className="shrink-0 mr-2 text-neon-green text-xs">{'>'}</span>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="pre-refactor"
-            className="flex-1 bg-transparent text-xs text-text-primary outline-none placeholder:text-text-muted"
+            size={1}
+            className="w-0 min-w-0 flex-1 bg-transparent text-xs text-text-primary outline-none placeholder:text-text-muted"
           />
         </div>
 
         <label className="mb-1 block text-[11px] text-text-secondary">
           description (optional)
         </label>
-        <div className="mb-3 flex items-center border border-border bg-bg-primary px-3 py-2 focus-within:border-neon-green/50">
-          <span className="mr-2 text-neon-green text-xs">{'>'}</span>
+        <div className="mb-3 flex items-baseline border border-border bg-bg-primary px-3 py-2 focus-within:border-neon-green/50">
+          <span className="shrink-0 mr-2 text-neon-green text-xs">{'>'}</span>
           <input
             type="text"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="before major changes"
-            className="flex-1 bg-transparent text-xs text-text-primary outline-none placeholder:text-text-muted"
+            size={1}
+            className="w-0 min-w-0 flex-1 bg-transparent text-xs text-text-primary outline-none placeholder:text-text-muted"
           />
         </div>
 

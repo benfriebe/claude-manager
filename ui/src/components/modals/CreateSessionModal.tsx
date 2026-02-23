@@ -1,6 +1,47 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
+
+function TerminalInput({
+  value,
+  onChange,
+  placeholder,
+  pattern,
+  autoFocus,
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  pattern?: string
+  autoFocus?: boolean
+}) {
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  return (
+    <div
+      className="flex items-center border border-border bg-bg-primary px-3 py-2 focus-within:border-neon-green/50"
+      onClick={() => wrapperRef.current?.querySelector('input')?.focus()}
+    >
+      <span className="mr-2 shrink-0 text-xs text-neon-green">{'>'}</span>
+      <div ref={wrapperRef} className="relative min-w-0 flex-1">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          pattern={pattern}
+          className="w-full bg-transparent text-xs text-text-primary caret-transparent outline-none placeholder:text-text-muted"
+          autoFocus={autoFocus}
+        />
+        {/* Invisible sizer + visible blinking cursor positioned after text */}
+        <div className="pointer-events-none absolute inset-0 flex items-center text-xs">
+          <span className="invisible whitespace-pre">{value || ''}</span>
+          <span className="animate-blink text-neon-green">_</span>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 interface CreateSessionModalProps {
   open: boolean
@@ -33,18 +74,14 @@ export function CreateSessionModal({ open, onClose, onCreate }: CreateSessionMod
         <label className="mb-1 block text-[11px] text-text-secondary">
           session name
         </label>
-        <div className="mb-4 flex items-center border border-border bg-bg-primary px-3 py-2 focus-within:border-neon-green/50">
-          <span className="mr-2 text-neon-green text-xs">{'>'}</span>
-          <input
-            type="text"
+        <div className="mb-2">
+          <TerminalInput
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={setName}
             placeholder="api-refactor"
             pattern="[a-z0-9\-]+"
-            className="flex-1 bg-transparent text-xs text-text-primary outline-none placeholder:text-text-muted"
             autoFocus
           />
-          <span className="animate-blink text-neon-green text-xs">_</span>
         </div>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>
