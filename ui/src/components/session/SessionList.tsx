@@ -37,7 +37,7 @@ export function SessionList({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto py-1">
+    <div className="flex-1 overflow-y-auto px-2 py-2">
       {sessions.map((s) => (
         <SessionCard
           key={s.vmid}

@@ -25,7 +25,7 @@ export function SessionCard({
   return (
     <div
       className={cn(
-        'group relative cursor-pointer border-l-2 border-transparent px-3 py-2.5 transition-all duration-150 hover:bg-bg-hover',
+        'group relative cursor-pointer border-l-2 border-transparent px-4 py-3 transition-all duration-150 hover:bg-bg-hover',
         active && 'border-l-neon-green bg-bg-hover',
       )}
       onClick={() => onSelect(session)}
