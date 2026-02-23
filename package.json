@@ -1,0 +1,14 @@
+{
+  "name": "claude-manager",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server/index.js",
+    "build": "cd ui && npm run build"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "node-pty": "^1.0.0",
+    "ws": "^8.18.0"
+  }
+}
