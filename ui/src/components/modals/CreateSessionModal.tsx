@@ -40,7 +40,7 @@ export function CreateSessionModal({ open, onClose, onCreate }: CreateSessionMod
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="api-refactor"
-            pattern="[a-z0-9-]+"
+            pattern="[a-z0-9\-]+"
             className="flex-1 bg-transparent text-xs text-text-primary outline-none placeholder:text-text-muted"
             autoFocus
           />
