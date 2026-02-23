@@ -170,7 +170,7 @@ export default function App() {
   )
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden">
+    <>
       <Scanline />
       <Toaster position="bottom-right" />
 
@@ -222,6 +222,6 @@ export default function App() {
           danger={confirm.danger}
         />
       )}
-    </div>
+    </>
   )
 }

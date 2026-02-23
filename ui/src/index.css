@@ -56,6 +56,24 @@
 }
 
 @layer base {
+  html, body, #root {
+    height: 100dvh;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  body {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+  }
+
+  #root {
+    display: flex;
+    flex-direction: column;
+  }
+
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--color-border-bright); border-radius: 2px; }
