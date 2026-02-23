@@ -9,5 +9,9 @@ export function TerminalView({ vmid }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   useTerminal(containerRef, vmid)
 
-  return <div ref={containerRef} className="flex-1 overflow-hidden" />
+  return (
+    <div className="relative flex-1 overflow-hidden">
+      <div ref={containerRef} className="absolute inset-0" />
+    </div>
+  )
 }
