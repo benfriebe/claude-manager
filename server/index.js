@@ -13,7 +13,7 @@ const server = createServer(app)
 const wss = new WebSocketServer({ server, path: '/terminal' })
 
 app.use(express.json())
-app.use(express.static(path.join(__dirname, '../client')))
+app.use(express.static(path.join(__dirname, '../dist')))
 
 // --- API Routes ---
 
@@ -112,6 +112,11 @@ app.post('/api/sessions/:vmid/snapshots/:snapname/rollback', async (req, res) =>
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
+})
+
+// SPA catch-all
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/index.html'))
 })
 
 // --- WebSocket terminal handler ---
