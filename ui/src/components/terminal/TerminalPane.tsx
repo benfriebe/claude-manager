@@ -18,7 +18,7 @@ export function TerminalPane({
 }: TerminalPaneProps) {
   return (
     <div
-      className={`flex flex-1 flex-col overflow-hidden bg-bg-primary ${
+      className={`flex min-h-0 flex-1 flex-col overflow-hidden bg-bg-primary ${
         mobileHidden ? 'max-sm:hidden' : ''
       }`}
     >

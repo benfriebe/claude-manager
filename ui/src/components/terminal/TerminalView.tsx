@@ -10,7 +10,7 @@ export function TerminalView({ vmid }: TerminalViewProps) {
   useTerminal(containerRef, vmid)
 
   return (
-    <div className="relative flex-1 overflow-hidden">
+    <div className="relative min-h-0 flex-1 overflow-hidden">
       <div ref={containerRef} className="absolute inset-0" />
     </div>
   )
