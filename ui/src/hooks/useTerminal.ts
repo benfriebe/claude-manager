@@ -60,12 +60,16 @@ export function useTerminal(
     term.loadAddon(fit)
     term.open(el)
 
-    // Mobile touch scrolling support
-    // xterm.js doesn't natively support touch scrolling
+    // Mobile touch scrolling workaround
+    // xterm.js's internal Gesture system intercepts touch events but its
+    // viewport scroll handling is broken in v6. Since wheel events work fine,
+    // we intercept touches in the capture phase (before xterm's handlers)
+    // and re-dispatch them as synthetic wheel events.
     // See: https://github.com/xtermjs/xterm.js/issues/5377
+    // See: https://github.com/xtermjs/xterm.js/pull/5685
+    const viewport = el.querySelector('.xterm-viewport') as HTMLElement | null
     let lastTouchY = 0
     let isTouchScrolling = false
-    const lineHeight = 13 * 1.2 // fontSize * lineHeight
 
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 1) {
@@ -79,23 +83,28 @@ export function useTerminal(
       const currentY = e.touches[0].clientY
       const deltaY = lastTouchY - currentY
       lastTouchY = currentY
-      const lines = Math.round(deltaY / lineHeight)
-      if (lines !== 0) {
-        term.scrollLines(lines)
-        e.preventDefault()
+
+      if (deltaY !== 0 && viewport) {
+        viewport.dispatchEvent(new WheelEvent('wheel', {
+          deltaY,
+          deltaMode: 0, // pixels
+          bubbles: true,
+          cancelable: true,
+        }))
       }
+
+      e.preventDefault()
+      e.stopPropagation()
     }
 
     const handleTouchEnd = () => {
       isTouchScrolling = false
     }
 
-    const xtermScreen = el.querySelector('.xterm-screen')
-    if (xtermScreen) {
-      xtermScreen.addEventListener('touchstart', handleTouchStart as EventListener, { passive: true })
-      xtermScreen.addEventListener('touchmove', handleTouchMove as EventListener, { passive: false })
-      xtermScreen.addEventListener('touchend', handleTouchEnd as EventListener, { passive: true })
-    }
+    // Use capture phase to intercept before xterm's internal Gesture system
+    el.addEventListener('touchstart', handleTouchStart, { capture: true, passive: true })
+    el.addEventListener('touchmove', handleTouchMove, { capture: true, passive: false })
+    el.addEventListener('touchend', handleTouchEnd, { capture: true, passive: true })
 
     const observer = new ResizeObserver(() => {
       fit.fit()
@@ -141,11 +150,9 @@ export function useTerminal(
 
     return () => {
       disposed = true
-      if (xtermScreen) {
-        xtermScreen.removeEventListener('touchstart', handleTouchStart as EventListener)
-        xtermScreen.removeEventListener('touchmove', handleTouchMove as EventListener)
-        xtermScreen.removeEventListener('touchend', handleTouchEnd as EventListener)
-      }
+      el.removeEventListener('touchstart', handleTouchStart, { capture: true })
+      el.removeEventListener('touchmove', handleTouchMove, { capture: true })
+      el.removeEventListener('touchend', handleTouchEnd, { capture: true })
       observer.disconnect()
       if (ws) ws.close()
       term.dispose()
