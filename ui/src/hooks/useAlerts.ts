@@ -50,6 +50,7 @@ export function useAlerts() {
   }, [])
 
   // Clear needs_input when user acknowledges (selects session or types)
+  // Also tells the server to clear, so stale state isn't re-broadcast
   const clearAlert = useCallback((vmid: number) => {
     setSessionStates((prev) => {
       if (prev.get(vmid) !== 'needs_input') return prev
@@ -57,6 +58,10 @@ export function useAlerts() {
       next.delete(vmid)
       return next
     })
+    // Notify server to clear this session's state
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'clear', vmid }))
+    }
   }, [])
 
   return { sessionStates, clearAlert }

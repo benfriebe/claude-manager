@@ -42,8 +42,7 @@ function eventToState(event) {
 }
 
 function broadcastState(vmid, state) {
-  const prev = sessionStates.get(vmid)
-  if (prev === state) return
+  const prev = sessionStates.get(vmid) ?? 'idle'
 
   if (state === 'idle') {
     sessionStates.delete(vmid)
@@ -51,12 +50,18 @@ function broadcastState(vmid, state) {
     sessionStates.set(vmid, state)
   }
 
+  // Always broadcast — client may have cleared state locally
+  console.log(`[alert] vmid=${vmid} ${prev} -> ${state}`)
+
   const msg = JSON.stringify({ type: 'state', vmid, state })
+  let sent = 0
   for (const client of alertsWss.clients) {
     if (client.readyState === client.OPEN) {
       client.send(msg)
+      sent++
     }
   }
+  console.log(`[alert] broadcast to ${sent} client(s)`)
 }
 
 // Cache hostname -> vmid mapping
@@ -82,15 +87,19 @@ app.use(express.static(path.join(__dirname, '../dist')))
 // Receive alert from Claude Code hooks running inside containers
 app.post('/api/alerts', async (req, res) => {
   const { hostname, event } = req.body
+  console.log(`[alert] POST /api/alerts hostname=${hostname} event=${event}`)
   if (!hostname || !event) return res.status(400).json({ error: 'hostname and event required' })
 
   try {
     const vmid = await resolveHostnameToVmid(hostname)
     const state = eventToState(event)
+    console.log(`[alert] resolved hostname=${hostname} -> vmid=${vmid}, event=${event} -> state=${state}`)
     if (vmid && state) {
       broadcastState(vmid, state)
     }
-  } catch {}
+  } catch (err) {
+    console.error(`[alert] error processing alert:`, err.message)
+  }
 
   res.json({ ok: true })
 })
@@ -126,11 +135,14 @@ app.post('/api/sessions', async (req, res) => {
     return res.status(400).json({ error: 'Name must be lowercase alphanumeric with hyphens' })
   }
   try {
+    console.log(`[session] creating session name=${name}`)
     const session = await proxmox.createSession(name)
+    console.log(`[session] created session vmid=${session.vmid} name=${name}`)
     // Provision hooks in background — don't block the response
     provisionHooks(session.vmid).catch(() => {})
     res.json(session)
   } catch (err) {
+    console.error(`[session] create failed name=${name}:`, err.message)
     res.status(500).json({ error: err.message })
   }
 })
@@ -138,9 +150,13 @@ app.post('/api/sessions', async (req, res) => {
 // Stop a session
 app.post('/api/sessions/:vmid/stop', async (req, res) => {
   try {
+    console.log(`[session] stopping vmid=${req.params.vmid}`)
     await proxmox.stopSession(req.params.vmid)
+    broadcastState(Number(req.params.vmid), 'idle')
+    console.log(`[session] stopped vmid=${req.params.vmid}`)
     res.json({ ok: true })
   } catch (err) {
+    console.error(`[session] stop failed vmid=${req.params.vmid}:`, err.message)
     res.status(500).json({ error: err.message })
   }
 })
@@ -148,9 +164,12 @@ app.post('/api/sessions/:vmid/stop', async (req, res) => {
 // Start a stopped session
 app.post('/api/sessions/:vmid/start', async (req, res) => {
   try {
+    console.log(`[session] starting vmid=${req.params.vmid}`)
     await proxmox.api('POST', `/nodes/${config.proxmox.node}/lxc/${req.params.vmid}/status/start`)
+    console.log(`[session] started vmid=${req.params.vmid}`)
     res.json({ ok: true })
   } catch (err) {
+    console.error(`[session] start failed vmid=${req.params.vmid}:`, err.message)
     res.status(500).json({ error: err.message })
   }
 })
@@ -158,9 +177,13 @@ app.post('/api/sessions/:vmid/start', async (req, res) => {
 // Destroy a session entirely
 app.delete('/api/sessions/:vmid', async (req, res) => {
   try {
+    console.log(`[session] destroying vmid=${req.params.vmid}`)
     await proxmox.destroySession(req.params.vmid)
+    broadcastState(Number(req.params.vmid), 'idle')
+    console.log(`[session] destroyed vmid=${req.params.vmid}`)
     res.json({ ok: true })
   } catch (err) {
+    console.error(`[session] destroy failed vmid=${req.params.vmid}:`, err.message)
     res.status(500).json({ error: err.message })
   }
 })
@@ -208,9 +231,22 @@ terminalWss.on('connection', (ws, req) => {
 
 // Send current state snapshot to newly connected alert clients
 alertsWss.on('connection', (ws) => {
+  console.log(`[ws] alert client connected (total: ${alertsWss.clients.size})`)
   for (const [vmid, state] of sessionStates) {
     ws.send(JSON.stringify({ type: 'state', vmid, state }))
   }
+  ws.on('message', (data) => {
+    try {
+      const msg = JSON.parse(data)
+      if (msg.type === 'clear' && msg.vmid) {
+        console.log(`[alert] client cleared vmid=${msg.vmid} (was ${sessionStates.get(msg.vmid) ?? 'idle'})`)
+        sessionStates.delete(msg.vmid)
+      }
+    } catch {}
+  })
+  ws.on('close', () => {
+    console.log(`[ws] alert client disconnected (total: ${alertsWss.clients.size})`)
+  })
 })
 
 server.listen(config.server.port, () => {
