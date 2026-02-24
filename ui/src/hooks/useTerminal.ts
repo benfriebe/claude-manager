@@ -60,6 +60,43 @@ export function useTerminal(
     term.loadAddon(fit)
     term.open(el)
 
+    // Mobile touch scrolling support
+    // xterm.js doesn't natively support touch scrolling
+    // See: https://github.com/xtermjs/xterm.js/issues/5377
+    let lastTouchY = 0
+    let isTouchScrolling = false
+    const lineHeight = 13 * 1.2 // fontSize * lineHeight
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        lastTouchY = e.touches[0].clientY
+        isTouchScrolling = true
+      }
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isTouchScrolling || e.touches.length !== 1) return
+      const currentY = e.touches[0].clientY
+      const deltaY = lastTouchY - currentY
+      lastTouchY = currentY
+      const lines = Math.round(deltaY / lineHeight)
+      if (lines !== 0) {
+        term.scrollLines(lines)
+        e.preventDefault()
+      }
+    }
+
+    const handleTouchEnd = () => {
+      isTouchScrolling = false
+    }
+
+    const xtermScreen = el.querySelector('.xterm-screen')
+    if (xtermScreen) {
+      xtermScreen.addEventListener('touchstart', handleTouchStart as EventListener, { passive: true })
+      xtermScreen.addEventListener('touchmove', handleTouchMove as EventListener, { passive: false })
+      xtermScreen.addEventListener('touchend', handleTouchEnd as EventListener, { passive: true })
+    }
+
     const observer = new ResizeObserver(() => {
       fit.fit()
       if (ws && ws.readyState === WebSocket.OPEN) {
@@ -104,6 +141,11 @@ export function useTerminal(
 
     return () => {
       disposed = true
+      if (xtermScreen) {
+        xtermScreen.removeEventListener('touchstart', handleTouchStart as EventListener)
+        xtermScreen.removeEventListener('touchmove', handleTouchMove as EventListener)
+        xtermScreen.removeEventListener('touchend', handleTouchEnd as EventListener)
+      }
       observer.disconnect()
       if (ws) ws.close()
       term.dispose()
@@ -114,5 +156,4 @@ export function useTerminal(
     }
   }, [vmid, containerRef])
 
-  return { termRef }
 }

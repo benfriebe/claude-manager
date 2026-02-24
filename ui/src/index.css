@@ -79,5 +79,12 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--color-border-bright); border-radius: 2px; }
 
-  .xterm { padding: 4px; }
+  .xterm {
+    padding: 4px;
+    touch-action: pan-y !important;
+  }
+  .xterm-viewport {
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch;
+  }
 }
