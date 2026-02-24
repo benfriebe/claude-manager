@@ -38,7 +38,7 @@ export function TerminalView({ vmid, onInput }: TerminalViewProps) {
     <div className="relative min-h-0 flex-1 overflow-hidden">
       <div
         ref={containerRef}
-        className="absolute inset-0 max-sm:bottom-11"
+        className="absolute inset-0 max-sm:bottom-12"
         style={{ touchAction: 'pan-y' }}
       />
       <div className="absolute inset-x-0 bottom-0 sm:hidden">
