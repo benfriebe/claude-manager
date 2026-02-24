@@ -60,33 +60,6 @@ export function useTerminal(
     term.loadAddon(fit)
     term.open(el)
 
-    // Touch scrolling for mobile — attach to .xterm-screen which sits on top
-    const screen = el.querySelector('.xterm-screen') as HTMLElement | null
-    let touchStartY = 0
-    let touchAccum = 0
-    const LINE_HEIGHT = 20
-
-    const onTouchStart = (e: TouchEvent) => {
-      touchStartY = e.touches[0].clientY
-      touchAccum = 0
-    }
-    const onTouchMove = (e: TouchEvent) => {
-      const dy = touchStartY - e.touches[0].clientY
-      touchAccum += dy
-      touchStartY = e.touches[0].clientY
-      const lines = Math.trunc(touchAccum / LINE_HEIGHT)
-      if (lines !== 0) {
-        term.scrollLines(lines)
-        touchAccum -= lines * LINE_HEIGHT
-      }
-      e.preventDefault()
-    }
-
-    if (screen) {
-      screen.addEventListener('touchstart', onTouchStart, { passive: true })
-      screen.addEventListener('touchmove', onTouchMove, { passive: false })
-    }
-
     const observer = new ResizeObserver(() => {
       fit.fit()
       if (ws && ws.readyState === WebSocket.OPEN) {
@@ -131,10 +104,6 @@ export function useTerminal(
 
     return () => {
       disposed = true
-      if (screen) {
-        screen.removeEventListener('touchstart', onTouchStart)
-        screen.removeEventListener('touchmove', onTouchMove)
-      }
       observer.disconnect()
       if (ws) ws.close()
       term.dispose()
@@ -144,4 +113,6 @@ export function useTerminal(
       observerRef.current = null
     }
   }, [vmid, containerRef])
+
+  return { termRef }
 }
