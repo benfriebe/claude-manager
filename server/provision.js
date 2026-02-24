@@ -68,15 +68,21 @@ export async function provisionHooks(vmid) {
     return
   }
 
-  // Wait for container to get an IP
+  // Wait for container to boot and get an IP
+  console.log(`[provision] waiting for container ${vmid} to get an IP...`)
+  await new Promise(r => setTimeout(r, 5000))
+
   let ip = null
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 20; i++) {
     ip = await proxmox.getContainerIP(vmid).catch(() => null)
-    if (ip) break
-    await new Promise(r => setTimeout(r, 2000))
+    if (ip) {
+      console.log(`[provision] container ${vmid} has IP ${ip}`)
+      break
+    }
+    await new Promise(r => setTimeout(r, 3000))
   }
   if (!ip) {
-    console.error(`[provision] could not get IP for container ${vmid}`)
+    console.error(`[provision] could not get IP for container ${vmid} after 65s`)
     return
   }
 
