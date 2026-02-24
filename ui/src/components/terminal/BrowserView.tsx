@@ -47,6 +47,15 @@ export function BrowserView({ ip, port, onPortChange }: BrowserViewProps) {
         >
           go
         </button>
+        {committed && (
+          <button
+            type="button"
+            onClick={() => window.open(`http://${ip}:${committed}`, '_blank')}
+            className="cursor-pointer border border-border px-2 py-0.5 font-mono text-xs text-text-secondary transition-colors hover:border-neon-green/60 hover:text-neon-green"
+          >
+            open in browser
+          </button>
+        )}
       </form>
       {committed ? (
         <iframe
