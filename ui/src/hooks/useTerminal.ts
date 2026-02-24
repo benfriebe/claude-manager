@@ -13,6 +13,9 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
     const el = containerRef.current
     if (!el || !vmid) return
 
+    let disposed = false
+    let ws: WebSocket | null = null
+
     const term = new Terminal({
       theme: {
         background: '#0a0e14',
@@ -46,46 +49,52 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(el)
-    fit.fit()
-
-    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const ws = new WebSocket(`${protocol}//${location.host}/terminal?vmid=${vmid}`)
-
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
-    }
-
-    ws.onmessage = (e) => {
-      const msg = JSON.parse(e.data)
-      if (msg.type === 'output') term.write(msg.data)
-    }
-
-    ws.onclose = () => {
-      term.write('\r\n\x1b[33m[connection closed]\x1b[0m\r\n')
-    }
-
-    term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'input', data }))
-      }
-    })
 
     const observer = new ResizeObserver(() => {
       fit.fit()
-      if (ws.readyState === WebSocket.OPEN) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
       }
     })
     observer.observe(el)
 
+    // Defer initial fit + WebSocket connection until browser layout is complete
+    requestAnimationFrame(() => {
+      if (disposed) return
+      fit.fit()
+
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+      ws = new WebSocket(`${protocol}//${location.host}/terminal?vmid=${vmid}`)
+      wsRef.current = ws
+
+      ws.onopen = () => {
+        ws!.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
+      }
+
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data)
+        if (msg.type === 'output') term.write(msg.data)
+      }
+
+      ws.onclose = () => {
+        term.write('\r\n\x1b[33m[connection closed]\x1b[0m\r\n')
+      }
+
+      term.onData((data) => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'input', data }))
+        }
+      })
+    })
+
     termRef.current = term
-    wsRef.current = ws
     fitRef.current = fit
     observerRef.current = observer
 
     return () => {
+      disposed = true
       observer.disconnect()
-      ws.close()
+      if (ws) ws.close()
       term.dispose()
       termRef.current = null
       wsRef.current = null
