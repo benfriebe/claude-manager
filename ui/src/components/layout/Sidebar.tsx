@@ -1,11 +1,12 @@
 import type { Session } from '../../types'
+import type { SessionActivity } from '../../hooks/useAlerts'
 import { SessionList } from '../session/SessionList'
 
 interface SidebarProps {
   sessions: Session[]
   loading: boolean
   activeVmid: number | null
-  alertVmids: Set<number>
+  sessionStates: Map<number, SessionActivity>
   onSelect: (session: Session) => void
   onStop: (vmid: number) => void
   onStart: (vmid: number) => void
@@ -17,7 +18,7 @@ export function Sidebar({
   sessions,
   loading,
   activeVmid,
-  alertVmids,
+  sessionStates,
   onSelect,
   onStop,
   onStart,
@@ -38,7 +39,7 @@ export function Sidebar({
         sessions={sessions}
         loading={loading}
         activeVmid={activeVmid}
-        alertVmids={alertVmids}
+        sessionStates={sessionStates}
         onSelect={onSelect}
         onStop={onStop}
         onStart={onStart}

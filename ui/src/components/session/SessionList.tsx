@@ -1,11 +1,12 @@
 import type { Session } from '../../types'
+import type { SessionActivity } from '../../hooks/useAlerts'
 import { SessionCard } from './SessionCard'
 
 interface SessionListProps {
   sessions: Session[]
   loading: boolean
   activeVmid: number | null
-  alertVmids: Set<number>
+  sessionStates: Map<number, SessionActivity>
   onSelect: (session: Session) => void
   onStop: (vmid: number) => void
   onStart: (vmid: number) => void
@@ -16,7 +17,7 @@ export function SessionList({
   sessions,
   loading,
   activeVmid,
-  alertVmids,
+  sessionStates,
   onSelect,
   onStop,
   onStart,
@@ -45,7 +46,7 @@ export function SessionList({
           key={s.vmid}
           session={s}
           active={activeVmid === s.vmid}
-          alerting={alertVmids.has(s.vmid)}
+          activity={sessionStates.get(s.vmid)}
           onSelect={onSelect}
           onStop={onStop}
           onStart={onStart}

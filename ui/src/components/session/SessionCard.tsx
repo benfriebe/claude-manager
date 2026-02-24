@@ -1,4 +1,5 @@
 import type { Session } from '../../types'
+import type { SessionActivity } from '../../hooks/useAlerts'
 import { cn } from '../../lib/cn'
 import { StatusIndicator } from './StatusIndicator'
 import { Button } from '../ui/Button'
@@ -6,7 +7,7 @@ import { Button } from '../ui/Button'
 interface SessionCardProps {
   session: Session
   active: boolean
-  alerting: boolean
+  activity?: SessionActivity
   onSelect: (session: Session) => void
   onStop: (vmid: number) => void
   onStart: (vmid: number) => void
@@ -16,7 +17,7 @@ interface SessionCardProps {
 export function SessionCard({
   session,
   active,
-  alerting,
+  activity,
   onSelect,
   onStop,
   onStart,
@@ -36,7 +37,7 @@ export function SessionCard({
         <span className="truncate text-xs font-medium text-text-primary">
           {displayName}
         </span>
-        <StatusIndicator status={session.status} alerting={alerting} />
+        <StatusIndicator status={session.status} activity={activity} />
       </div>
 
       <div className="flex gap-2 text-[10px] text-text-muted">

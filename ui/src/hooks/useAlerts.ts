@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
+export type SessionActivity = 'active' | 'needs_input'
+
 export function useAlerts() {
-  const [alertVmids, setAlertVmids] = useState<Set<number>>(new Set())
+  const [sessionStates, setSessionStates] = useState<Map<number, SessionActivity>>(new Map())
   const wsRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
@@ -17,11 +19,14 @@ export function useAlerts() {
 
       ws.onmessage = (e) => {
         const msg = JSON.parse(e.data)
-        if (msg.type === 'bell') {
-          setAlertVmids((prev) => {
-            if (prev.has(msg.vmid)) return prev
-            const next = new Set(prev)
-            next.add(msg.vmid)
+        if (msg.type === 'state') {
+          setSessionStates((prev) => {
+            const next = new Map(prev)
+            if (msg.state === 'idle') {
+              next.delete(msg.vmid)
+            } else {
+              next.set(msg.vmid, msg.state as SessionActivity)
+            }
             return next
           })
         }
@@ -44,14 +49,15 @@ export function useAlerts() {
     }
   }, [])
 
+  // Clear needs_input (user is responding) — transitions to active
   const clearAlert = useCallback((vmid: number) => {
-    setAlertVmids((prev) => {
-      if (!prev.has(vmid)) return prev
-      const next = new Set(prev)
-      next.delete(vmid)
+    setSessionStates((prev) => {
+      if (prev.get(vmid) !== 'needs_input') return prev
+      const next = new Map(prev)
+      next.set(vmid, 'active')
       return next
     })
   }, [])
 
-  return { alertVmids, clearAlert }
+  return { sessionStates, clearAlert }
 }

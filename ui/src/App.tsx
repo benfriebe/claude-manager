@@ -44,7 +44,7 @@ interface ConfirmState {
 
 export default function App() {
   const { sessions, loading, refetch } = useSessions()
-  const { alertVmids, clearAlert } = useAlerts()
+  const { sessionStates, clearAlert } = useAlerts()
   const [activeSession, setActiveSession] = useState<Session | null>(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [snapshotModalOpen, setSnapshotModalOpen] = useState(false)
@@ -191,7 +191,7 @@ export default function App() {
           sessions={sessions}
           loading={loading}
           activeVmid={activeSession?.vmid ?? null}
-          alertVmids={alertVmids}
+          sessionStates={sessionStates}
           onSelect={selectSession}
           onStop={handleStop}
           onStart={handleStart}

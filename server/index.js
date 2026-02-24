@@ -5,7 +5,6 @@ import { fileURLToPath } from 'url'
 import path from 'path'
 import * as proxmox from './proxmox.js'
 import { handleTerminalSocket } from './terminal.js'
-import { SessionMonitor } from './monitor.js'
 import config from '../config.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -31,18 +30,28 @@ server.on('upgrade', (req, socket, head) => {
   }
 })
 
-// --- Bell broadcast with per-vmid debounce ---
-const lastBellTime = new Map()
-const BELL_COOLDOWN = 2_000
+// --- Session activity state broadcast ---
+// States: 'active' (Claude working), 'needs_input' (waiting for user), 'idle' (finished)
+const sessionStates = new Map() // vmid -> state
 
-function broadcastBell(vmid) {
-  const now = Date.now()
-  const last = lastBellTime.get(vmid) || 0
-  if (now - last < BELL_COOLDOWN) return
+function eventToState(event) {
+  if (event === 'Notification') return 'needs_input'
+  if (event === 'UserPromptSubmit' || event === 'SubagentStart') return 'active'
+  if (event === 'Stop') return 'idle'
+  return null
+}
 
-  lastBellTime.set(vmid, now)
-  console.log(`[bell] broadcasting bell for vmid=${vmid} to ${alertsWss.clients.size} client(s)`)
-  const msg = JSON.stringify({ type: 'bell', vmid })
+function broadcastState(vmid, state) {
+  const prev = sessionStates.get(vmid)
+  if (prev === state) return
+
+  if (state === 'idle') {
+    sessionStates.delete(vmid)
+  } else {
+    sessionStates.set(vmid, state)
+  }
+
+  const msg = JSON.stringify({ type: 'state', vmid, state })
   for (const client of alertsWss.clients) {
     if (client.readyState === client.OPEN) {
       client.send(msg)
@@ -50,10 +59,41 @@ function broadcastBell(vmid) {
   }
 }
 
+// Cache hostname -> vmid mapping
+let hostnameCache = new Map()
+let hostnameCacheTime = 0
+const CACHE_TTL = 10_000
+
+async function resolveHostnameToVmid(hostname) {
+  const now = Date.now()
+  if (now - hostnameCacheTime > CACHE_TTL) {
+    const containers = await proxmox.listContainers()
+    hostnameCache = new Map(containers.map(c => [c.name, c.vmid]))
+    hostnameCacheTime = now
+  }
+  return hostnameCache.get(hostname) ?? null
+}
+
 app.use(express.json())
 app.use(express.static(path.join(__dirname, '../dist')))
 
 // --- API Routes ---
+
+// Receive alert from Claude Code hooks running inside containers
+app.post('/api/alerts', async (req, res) => {
+  const { hostname, event } = req.body
+  if (!hostname || !event) return res.status(400).json({ error: 'hostname and event required' })
+
+  try {
+    const vmid = await resolveHostnameToVmid(hostname)
+    const state = eventToState(event)
+    if (vmid && state) {
+      broadcastState(vmid, state)
+    }
+  } catch {}
+
+  res.json({ ok: true })
+})
 
 // List all claude- containers with status
 app.get('/api/sessions', async (req, res) => {
@@ -157,25 +197,19 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'))
 })
 
-// --- WebSocket terminal handler (also detects bells for the active session) ---
+// --- WebSocket handlers ---
 terminalWss.on('connection', (ws, req) => {
   const vmid = new URL(req.url, 'http://localhost').searchParams.get('vmid')
   if (!vmid) return ws.close()
-  handleTerminalSocket(ws, vmid, { onBell: broadcastBell })
+  handleTerminalSocket(ws, vmid)
 })
 
-// --- Alerts WebSocket ---
+// Send current state snapshot to newly connected alert clients
 alertsWss.on('connection', (ws) => {
-  console.log(`[alerts] client connected (total: ${alertsWss.clients.size})`)
-  ws.on('close', () => {
-    console.log(`[alerts] client disconnected (total: ${alertsWss.clients.size})`)
-  })
+  for (const [vmid, state] of sessionStates) {
+    ws.send(JSON.stringify({ type: 'state', vmid, state }))
+  }
 })
-
-// --- Session monitor for bell detection across all sessions ---
-const monitor = new SessionMonitor()
-monitor.on('bell', broadcastBell)
-monitor.start()
 
 server.listen(config.server.port, () => {
   console.log(`Claude Manager running on :${config.server.port}`)
