@@ -60,6 +60,30 @@ export function useTerminal(
     term.loadAddon(fit)
     term.open(el)
 
+    // Touch scrolling for mobile
+    let touchStartY = 0
+    let touchAccum = 0
+    const LINE_HEIGHT = 20
+
+    const onTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0].clientY
+      touchAccum = 0
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      const dy = touchStartY - e.touches[0].clientY
+      touchAccum += dy
+      touchStartY = e.touches[0].clientY
+      const lines = Math.trunc(touchAccum / LINE_HEIGHT)
+      if (lines !== 0) {
+        term.scrollLines(lines)
+        touchAccum -= lines * LINE_HEIGHT
+      }
+      e.preventDefault()
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+
     const observer = new ResizeObserver(() => {
       fit.fit()
       if (ws && ws.readyState === WebSocket.OPEN) {
@@ -104,6 +128,8 @@ export function useTerminal(
 
     return () => {
       disposed = true
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
       observer.disconnect()
       if (ws) ws.close()
       term.dispose()
