@@ -3,8 +3,15 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 
+interface ModifierState {
+  ctrl: boolean
+  alt: boolean
+}
+
 interface UseTerminalOptions {
   onInput?: () => void
+  modifierRef?: React.RefObject<ModifierState>
+  onModifierConsumed?: () => void
 }
 
 export function useTerminal(
@@ -138,7 +145,22 @@ export function useTerminal(
 
       term.onData((data) => {
         if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'input', data }))
+          const mod = optionsRef.current?.modifierRef?.current
+          let transformed = data
+          if (mod && (mod.ctrl || mod.alt) && data.length === 1) {
+            if (mod.ctrl) {
+              const code = data.toLowerCase().charCodeAt(0)
+              if (code >= 97 && code <= 122) {
+                transformed = String.fromCharCode(code - 96)
+              }
+            } else if (mod.alt) {
+              transformed = '\x1b' + data
+            }
+            mod.ctrl = false
+            mod.alt = false
+            optionsRef.current?.onModifierConsumed?.()
+          }
+          ws.send(JSON.stringify({ type: 'input', data: transformed }))
           optionsRef.current?.onInput?.()
         }
       })
@@ -163,4 +185,9 @@ export function useTerminal(
     }
   }, [vmid, containerRef])
 
+  const sendInput = (data: string) => {
+    termRef.current?.input(data)
+  }
+
+  return { sendInput }
 }
