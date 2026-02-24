@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url'
 import path from 'path'
 import * as proxmox from './proxmox.js'
 import { handleTerminalSocket } from './terminal.js'
+import { provisionHooks } from './provision.js'
 import config from '../config.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -127,6 +128,8 @@ app.post('/api/sessions', async (req, res) => {
   }
   try {
     const session = await proxmox.createSession(name)
+    // Provision hooks in background — don't block the response
+    provisionHooks(session.vmid).catch(() => {})
     res.json(session)
   } catch (err) {
     res.status(500).json({ error: err.message })

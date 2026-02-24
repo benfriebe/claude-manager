@@ -11,5 +11,6 @@ export default {
     server: {
       port: 3000,
       sessionSecret: 'change-this-to-something-random',
+      managerUrl: 'http://10.0.0.1:3000',  // URL containers use to reach this server
     }
   }
