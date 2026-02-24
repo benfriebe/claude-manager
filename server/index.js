@@ -36,9 +36,8 @@ server.on('upgrade', (req, socket, head) => {
 const sessionStates = new Map() // vmid -> state
 
 function eventToState(event) {
-  if (event === 'Notification') return 'needs_input'
+  if (event === 'Notification' || event === 'Stop') return 'needs_input'
   if (event === 'UserPromptSubmit' || event === 'SubagentStart') return 'active'
-  if (event === 'Stop') return 'idle'
   return null
 }
 

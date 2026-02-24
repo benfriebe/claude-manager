@@ -49,12 +49,12 @@ export function useAlerts() {
     }
   }, [])
 
-  // Clear needs_input (user is responding) — transitions to active
+  // Clear needs_input when user acknowledges (selects session or types)
   const clearAlert = useCallback((vmid: number) => {
     setSessionStates((prev) => {
       if (prev.get(vmid) !== 'needs_input') return prev
       const next = new Map(prev)
-      next.set(vmid, 'active')
+      next.delete(vmid)
       return next
     })
   }, [])
