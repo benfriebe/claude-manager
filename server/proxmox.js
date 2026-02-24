@@ -40,8 +40,9 @@ async function api(method, path, body = null) {
 export async function listContainers() {
   const containers = await api('GET', `/nodes/${node}/lxc`)
   // Enrich with config data for containers that match our naming convention
+  const { templateId } = config.proxmox
   return containers
-    .filter(c => c.name?.startsWith('claude-'))
+    .filter(c => c.name?.startsWith('claude-') && c.vmid !== templateId)
     .sort((a, b) => a.vmid - b.vmid)
 }
 
