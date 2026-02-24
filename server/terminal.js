@@ -1,7 +1,7 @@
 import { spawn } from 'node-pty'
 import * as proxmox from './proxmox.js'
 
-export async function handleTerminalSocket(ws, vmid) {
+export async function handleTerminalSocket(ws, vmid, { onBell } = {}) {
   // Get the container's IP directly
   const ip = await proxmox.getContainerIP(vmid)
   if (!ip) {
@@ -26,6 +26,7 @@ export async function handleTerminalSocket(ws, vmid) {
 
   pty.onData(data => {
     if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type: 'output', data }))
+    if (data.includes('\x07') && onBell) onBell(Number(vmid))
   })
 
   pty.onExit(() => ws.close())

@@ -3,17 +3,17 @@ import { EventEmitter } from 'events'
 import * as proxmox from './proxmox.js'
 
 const SYNC_INTERVAL = 15_000
-const BELL_COOLDOWN = 2_000 // debounce rapid bells per session
+const RETRY_DELAY = 5_000
 
 export class SessionMonitor extends EventEmitter {
   constructor() {
     super()
     this.connections = new Map() // vmid -> { pty, ip }
-    this.lastBell = new Map()   // vmid -> timestamp
     this.pollInterval = null
   }
 
   start() {
+    console.log('[monitor] starting session monitor')
     this.sync()
     this.pollInterval = setInterval(() => this.sync(), SYNC_INTERVAL)
   }
@@ -35,6 +35,7 @@ export class SessionMonitor extends EventEmitter {
       // Remove connections for stopped/destroyed containers
       for (const [vmid, conn] of this.connections) {
         if (!runningVmids.has(vmid)) {
+          console.log(`[monitor] removing monitor for stopped container ${vmid}`)
           conn.pty.kill()
           this.connections.delete(vmid)
         }
@@ -44,15 +45,21 @@ export class SessionMonitor extends EventEmitter {
       for (const container of running) {
         if (!this.connections.has(container.vmid)) {
           const ip = await proxmox.getContainerIP(container.vmid).catch(() => null)
-          if (ip) this.connect(container.vmid, ip)
+          if (ip) {
+            this.connect(container.vmid, ip)
+          } else {
+            console.log(`[monitor] no IP for container ${container.vmid}, will retry`)
+          }
         }
       }
     } catch (err) {
-      // Silently retry on next cycle
+      console.error('[monitor] sync error:', err.message)
     }
   }
 
   connect(vmid, ip) {
+    console.log(`[monitor] connecting to container ${vmid} (${ip})`)
+
     const pty = spawn('ssh', [
       '-tt',
       '-o', 'StrictHostKeyChecking=no',
@@ -71,18 +78,14 @@ export class SessionMonitor extends EventEmitter {
 
     pty.onData(data => {
       if (data.includes('\x07')) {
-        const now = Date.now()
-        const last = this.lastBell.get(vmid) || 0
-        if (now - last > BELL_COOLDOWN) {
-          this.lastBell.set(vmid, now)
-          this.emit('bell', vmid)
-        }
+        console.log(`[monitor] bell detected from container ${vmid}`)
+        this.emit('bell', vmid)
       }
     })
 
-    pty.onExit(() => {
+    pty.onExit(({ exitCode }) => {
+      console.log(`[monitor] container ${vmid} monitor exited (code=${exitCode})`)
       this.connections.delete(vmid)
-      // Retry connection on next sync cycle
     })
 
     this.connections.set(vmid, { pty, ip })

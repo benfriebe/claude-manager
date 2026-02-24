@@ -31,6 +31,25 @@ server.on('upgrade', (req, socket, head) => {
   }
 })
 
+// --- Bell broadcast with per-vmid debounce ---
+const lastBellTime = new Map()
+const BELL_COOLDOWN = 2_000
+
+function broadcastBell(vmid) {
+  const now = Date.now()
+  const last = lastBellTime.get(vmid) || 0
+  if (now - last < BELL_COOLDOWN) return
+
+  lastBellTime.set(vmid, now)
+  console.log(`[bell] broadcasting bell for vmid=${vmid} to ${alertsWss.clients.size} client(s)`)
+  const msg = JSON.stringify({ type: 'bell', vmid })
+  for (const client of alertsWss.clients) {
+    if (client.readyState === client.OPEN) {
+      client.send(msg)
+    }
+  }
+}
+
 app.use(express.json())
 app.use(express.static(path.join(__dirname, '../dist')))
 
@@ -138,25 +157,24 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'))
 })
 
-// --- WebSocket terminal handler ---
+// --- WebSocket terminal handler (also detects bells for the active session) ---
 terminalWss.on('connection', (ws, req) => {
   const vmid = new URL(req.url, 'http://localhost').searchParams.get('vmid')
   if (!vmid) return ws.close()
-  handleTerminalSocket(ws, vmid)
+  handleTerminalSocket(ws, vmid, { onBell: broadcastBell })
 })
 
-// --- Session monitor for bell detection ---
+// --- Alerts WebSocket ---
+alertsWss.on('connection', (ws) => {
+  console.log(`[alerts] client connected (total: ${alertsWss.clients.size})`)
+  ws.on('close', () => {
+    console.log(`[alerts] client disconnected (total: ${alertsWss.clients.size})`)
+  })
+})
+
+// --- Session monitor for bell detection across all sessions ---
 const monitor = new SessionMonitor()
-
-monitor.on('bell', (vmid) => {
-  const msg = JSON.stringify({ type: 'bell', vmid })
-  for (const client of alertsWss.clients) {
-    if (client.readyState === client.OPEN) {
-      client.send(msg)
-    }
-  }
-})
-
+monitor.on('bell', broadcastBell)
 monitor.start()
 
 server.listen(config.server.port, () => {
