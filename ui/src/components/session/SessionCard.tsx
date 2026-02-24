@@ -6,6 +6,7 @@ import { Button } from '../ui/Button'
 interface SessionCardProps {
   session: Session
   active: boolean
+  alerting: boolean
   onSelect: (session: Session) => void
   onStop: (vmid: number) => void
   onStart: (vmid: number) => void
@@ -15,6 +16,7 @@ interface SessionCardProps {
 export function SessionCard({
   session,
   active,
+  alerting,
   onSelect,
   onStop,
   onStart,
@@ -34,7 +36,7 @@ export function SessionCard({
         <span className="truncate text-xs font-medium text-text-primary">
           {displayName}
         </span>
-        <StatusIndicator status={session.status} />
+        <StatusIndicator status={session.status} alerting={alerting} />
       </div>
 
       <div className="flex gap-2 text-[10px] text-text-muted">

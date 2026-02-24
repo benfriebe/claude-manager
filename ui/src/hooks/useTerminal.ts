@@ -3,11 +3,21 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 
-export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>, vmid: number | null) {
+interface UseTerminalOptions {
+  onInput?: () => void
+}
+
+export function useTerminal(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  vmid: number | null,
+  options?: UseTerminalOptions,
+) {
   const termRef = useRef<Terminal | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
+  const optionsRef = useRef(options)
+  optionsRef.current = options
 
   useEffect(() => {
     const el = containerRef.current
@@ -83,6 +93,7 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
       term.onData((data) => {
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'input', data }))
+          optionsRef.current?.onInput?.()
         }
       })
     })

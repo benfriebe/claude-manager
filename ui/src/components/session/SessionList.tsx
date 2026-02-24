@@ -5,6 +5,7 @@ interface SessionListProps {
   sessions: Session[]
   loading: boolean
   activeVmid: number | null
+  alertVmids: Set<number>
   onSelect: (session: Session) => void
   onStop: (vmid: number) => void
   onStart: (vmid: number) => void
@@ -15,6 +16,7 @@ export function SessionList({
   sessions,
   loading,
   activeVmid,
+  alertVmids,
   onSelect,
   onStop,
   onStart,
@@ -43,6 +45,7 @@ export function SessionList({
           key={s.vmid}
           session={s}
           active={activeVmid === s.vmid}
+          alerting={alertVmids.has(s.vmid)}
           onSelect={onSelect}
           onStop={onStop}
           onStart={onStart}

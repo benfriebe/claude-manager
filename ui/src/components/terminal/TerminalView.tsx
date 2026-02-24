@@ -3,11 +3,12 @@ import { useTerminal } from '../../hooks/useTerminal'
 
 interface TerminalViewProps {
   vmid: number
+  onInput?: () => void
 }
 
-export function TerminalView({ vmid }: TerminalViewProps) {
+export function TerminalView({ vmid, onInput }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  useTerminal(containerRef, vmid)
+  useTerminal(containerRef, vmid, { onInput })
 
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">

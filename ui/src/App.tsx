@@ -3,6 +3,7 @@ import toast, { Toaster } from 'react-hot-toast'
 import type { Session } from './types'
 import { api } from './lib/api'
 import { useSessions } from './hooks/useSessions'
+import { useAlerts } from './hooks/useAlerts'
 import { Header } from './components/layout/Header'
 import { MainLayout } from './components/layout/MainLayout'
 import { Sidebar } from './components/layout/Sidebar'
@@ -43,6 +44,7 @@ interface ConfirmState {
 
 export default function App() {
   const { sessions, loading, refetch } = useSessions()
+  const { alertVmids, clearAlert } = useAlerts()
   const [activeSession, setActiveSession] = useState<Session | null>(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [snapshotModalOpen, setSnapshotModalOpen] = useState(false)
@@ -57,9 +59,17 @@ export default function App() {
       }
       setActiveSession(session)
       setMobileShowTerminal(true)
+      clearAlert(session.vmid)
     },
-    [],
+    [clearAlert],
   )
+
+  const handleTerminalInput = useCallback(() => {
+    setActiveSession((current) => {
+      if (current) clearAlert(current.vmid)
+      return current
+    })
+  }, [clearAlert])
 
   const handleBack = useCallback(() => {
     setActiveSession(null)
@@ -181,6 +191,7 @@ export default function App() {
           sessions={sessions}
           loading={loading}
           activeVmid={activeSession?.vmid ?? null}
+          alertVmids={alertVmids}
           onSelect={selectSession}
           onStop={handleStop}
           onStart={handleStart}
@@ -191,6 +202,7 @@ export default function App() {
           session={activeSession}
           onSnapshot={() => setSnapshotModalOpen(true)}
           onBack={handleBack}
+          onInput={handleTerminalInput}
           mobileHidden={!mobileShowTerminal && activeSession !== null}
         />
       </MainLayout>

@@ -5,12 +5,31 @@ import { fileURLToPath } from 'url'
 import path from 'path'
 import * as proxmox from './proxmox.js'
 import { handleTerminalSocket } from './terminal.js'
+import { SessionMonitor } from './monitor.js'
 import config from '../config.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const server = createServer(app)
-const wss = new WebSocketServer({ server, path: '/terminal' })
+
+const terminalWss = new WebSocketServer({ noServer: true })
+const alertsWss = new WebSocketServer({ noServer: true })
+
+// Route WebSocket upgrades to the correct handler
+server.on('upgrade', (req, socket, head) => {
+  const { pathname } = new URL(req.url, 'http://localhost')
+  if (pathname === '/terminal') {
+    terminalWss.handleUpgrade(req, socket, head, (ws) => {
+      terminalWss.emit('connection', ws, req)
+    })
+  } else if (pathname === '/alerts') {
+    alertsWss.handleUpgrade(req, socket, head, (ws) => {
+      alertsWss.emit('connection', ws, req)
+    })
+  } else {
+    socket.destroy()
+  }
+})
 
 app.use(express.json())
 app.use(express.static(path.join(__dirname, '../dist')))
@@ -22,7 +41,7 @@ app.get('/api/sessions', async (req, res) => {
   try {
     const containers = await proxmox.listContainers()
     const sessions = await Promise.all(containers.map(async c => {
-      const ip = c.status === 'running' 
+      const ip = c.status === 'running'
         ? await proxmox.getContainerIP(c.vmid).catch(() => null)
         : null
       return {
@@ -120,11 +139,25 @@ app.get('*', (req, res) => {
 })
 
 // --- WebSocket terminal handler ---
-wss.on('connection', (ws, req) => {
+terminalWss.on('connection', (ws, req) => {
   const vmid = new URL(req.url, 'http://localhost').searchParams.get('vmid')
   if (!vmid) return ws.close()
   handleTerminalSocket(ws, vmid)
 })
+
+// --- Session monitor for bell detection ---
+const monitor = new SessionMonitor()
+
+monitor.on('bell', (vmid) => {
+  const msg = JSON.stringify({ type: 'bell', vmid })
+  for (const client of alertsWss.clients) {
+    if (client.readyState === client.OPEN) {
+      client.send(msg)
+    }
+  }
+})
+
+monitor.start()
 
 server.listen(config.server.port, () => {
   console.log(`Claude Manager running on :${config.server.port}`)

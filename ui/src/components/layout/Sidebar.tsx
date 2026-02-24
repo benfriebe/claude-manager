@@ -5,6 +5,7 @@ interface SidebarProps {
   sessions: Session[]
   loading: boolean
   activeVmid: number | null
+  alertVmids: Set<number>
   onSelect: (session: Session) => void
   onStop: (vmid: number) => void
   onStart: (vmid: number) => void
@@ -16,6 +17,7 @@ export function Sidebar({
   sessions,
   loading,
   activeVmid,
+  alertVmids,
   onSelect,
   onStop,
   onStart,
@@ -36,6 +38,7 @@ export function Sidebar({
         sessions={sessions}
         loading={loading}
         activeVmid={activeVmid}
+        alertVmids={alertVmids}
         onSelect={onSelect}
         onStop={onStop}
         onStart={onStart}

@@ -11,6 +11,7 @@ interface TerminalPaneProps {
   session: Session | null
   onSnapshot: () => void
   onBack: () => void
+  onInput?: () => void
   mobileHidden: boolean
 }
 
@@ -18,6 +19,7 @@ export function TerminalPane({
   session,
   onSnapshot,
   onBack,
+  onInput,
   mobileHidden,
 }: TerminalPaneProps) {
   const [activeTab, setActiveTab] = useState<Tab>('terminal')
@@ -57,7 +59,7 @@ export function TerminalPane({
                     : 'hidden'
               }`}
             >
-              <TerminalView key={session.vmid} vmid={session.vmid} />
+              <TerminalView key={session.vmid} vmid={session.vmid} onInput={onInput} />
             </div>
             <div
               className={`flex min-h-0 flex-col ${
