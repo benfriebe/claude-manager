@@ -1,11 +1,8 @@
 import { execFile } from 'child_process'
 import { promisify } from 'util'
-import { fileURLToPath } from 'url'
-import path from 'path'
 import config from '../config.js'
 import * as proxmox from './proxmox.js'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const execFileAsync = promisify(execFile)
 
 const SSH_OPTS = [
@@ -14,30 +11,8 @@ const SSH_OPTS = [
   '-i', '/root/.ssh/id_rsa',
 ]
 
-const HOOKS_SETTINGS = JSON.stringify({
-  hooks: {
-    Notification: [{
-      matcher: 'permission_prompt|idle_prompt|elicitation_dialog',
-      hooks: [{ type: 'command', command: '/opt/claude-manager/notify.sh' }],
-    }],
-    UserPromptSubmit: [{
-      hooks: [{ type: 'command', command: '/opt/claude-manager/notify.sh' }],
-    }],
-    SubagentStart: [{
-      hooks: [{ type: 'command', command: '/opt/claude-manager/notify.sh' }],
-    }],
-    Stop: [{
-      hooks: [{ type: 'command', command: '/opt/claude-manager/notify.sh' }],
-    }],
-  },
-}, null, 2)
-
 function ssh(ip, command) {
   return execFileAsync('ssh', [...SSH_OPTS, `root@${ip}`, command], { timeout: 15000 })
-}
-
-function scp(localPath, ip, remotePath) {
-  return execFileAsync('scp', [...SSH_OPTS, localPath, `root@${ip}:${remotePath}`], { timeout: 15000 })
 }
 
 async function waitForSSH(ip, maxWait = 30000) {
@@ -51,6 +26,39 @@ async function waitForSSH(ip, maxWait = 30000) {
     }
   }
   return false
+}
+
+function buildNotifyScript(managerUrl) {
+  // No jq, no env vars — URL baked in, event name passed as $1
+  return [
+    '#!/bin/bash',
+    `curl -sf -X POST '${managerUrl}/api/alerts' \\`,
+    `  -H 'Content-Type: application/json' \\`,
+    `  -d "{\\"hostname\\":\\"$(hostname)\\",\\"event\\":\\"$1\\"}" \\`,
+    '  >/dev/null 2>&1 &',
+    'exit 0',
+  ].join('\n')
+}
+
+function buildHooksSettings() {
+  const cmd = '/opt/claude-manager/notify.sh'
+  return JSON.stringify({
+    hooks: {
+      Notification: [{
+        matcher: 'permission_prompt|idle_prompt|elicitation_dialog',
+        hooks: [{ type: 'command', command: `${cmd} Notification` }],
+      }],
+      UserPromptSubmit: [{
+        hooks: [{ type: 'command', command: `${cmd} UserPromptSubmit` }],
+      }],
+      SubagentStart: [{
+        hooks: [{ type: 'command', command: `${cmd} SubagentStart` }],
+      }],
+      Stop: [{
+        hooks: [{ type: 'command', command: `${cmd} Stop` }],
+      }],
+    },
+  }, null, 2)
 }
 
 export async function provisionHooks(vmid) {
@@ -79,17 +87,13 @@ export async function provisionHooks(vmid) {
   }
 
   try {
-    // Install notify script
-    await ssh(ip, 'mkdir -p /opt/claude-manager')
-    await scp(path.join(__dirname, '../container-hooks/notify.sh'), ip, '/opt/claude-manager/notify.sh')
-    await ssh(ip, 'chmod +x /opt/claude-manager/notify.sh')
-
-    // Set CLAUDE_MANAGER_URL in environment
-    await ssh(ip, `grep -q '^CLAUDE_MANAGER_URL=' /etc/environment 2>/dev/null && sed -i 's|^CLAUDE_MANAGER_URL=.*|CLAUDE_MANAGER_URL=${managerUrl}|' /etc/environment || echo 'CLAUDE_MANAGER_URL=${managerUrl}' >> /etc/environment`)
+    // Write notify script with URL baked in
+    const scriptB64 = Buffer.from(buildNotifyScript(managerUrl)).toString('base64')
+    await ssh(ip, `mkdir -p /opt/claude-manager && echo '${scriptB64}' | base64 -d > /opt/claude-manager/notify.sh && chmod +x /opt/claude-manager/notify.sh`)
 
     // Write Claude Code hook settings
-    const b64 = Buffer.from(HOOKS_SETTINGS).toString('base64')
-    await ssh(ip, `mkdir -p ~/.claude && echo '${b64}' | base64 -d > ~/.claude/settings.json`)
+    const settingsB64 = Buffer.from(buildHooksSettings()).toString('base64')
+    await ssh(ip, `mkdir -p ~/.claude && echo '${settingsB64}' | base64 -d > ~/.claude/settings.json`)
 
     console.log(`[provision] hooks installed on container ${vmid} (${ip})`)
   } catch (err) {

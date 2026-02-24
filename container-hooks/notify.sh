@@ -1,19 +1,14 @@
 #!/bin/bash
 # Called by Claude Code hooks inside containers.
-# Reads hook JSON from stdin, POSTs event to the claude-manager server.
-# CLAUDE_MANAGER_URL must be set (e.g. http://10.0.0.1:3000)
+# Event name is passed as $1 (e.g. "Stop", "Notification").
+# URL is baked in by provision.js — this copy is a template for manual installs.
+# Replace MANAGER_URL below with your server's address.
 
-INPUT=$(cat)
-HOST=$(hostname)
-EVENT=$(echo "$INPUT" | jq -r '.hook_event_name // empty')
+MANAGER_URL="${CLAUDE_MANAGER_URL:-http://CHANGE_ME:3000}"
 
-if [ -z "$CLAUDE_MANAGER_URL" ] || [ -z "$EVENT" ]; then
-  exit 0
-fi
-
-curl -sf -X POST "${CLAUDE_MANAGER_URL}/api/alerts" \
+curl -sf -X POST "${MANAGER_URL}/api/alerts" \
   -H 'Content-Type: application/json' \
-  -d "{\"hostname\":\"$HOST\",\"event\":\"$EVENT\"}" \
+  -d "{\"hostname\":\"$(hostname)\",\"event\":\"$1\"}" \
   >/dev/null 2>&1 &
 
 exit 0
