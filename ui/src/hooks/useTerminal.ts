@@ -60,7 +60,8 @@ export function useTerminal(
     term.loadAddon(fit)
     term.open(el)
 
-    // Touch scrolling for mobile
+    // Touch scrolling for mobile — attach to .xterm-screen which sits on top
+    const screen = el.querySelector('.xterm-screen') as HTMLElement | null
     let touchStartY = 0
     let touchAccum = 0
     const LINE_HEIGHT = 20
@@ -81,8 +82,10 @@ export function useTerminal(
       e.preventDefault()
     }
 
-    el.addEventListener('touchstart', onTouchStart, { passive: true })
-    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    if (screen) {
+      screen.addEventListener('touchstart', onTouchStart, { passive: true })
+      screen.addEventListener('touchmove', onTouchMove, { passive: false })
+    }
 
     const observer = new ResizeObserver(() => {
       fit.fit()
@@ -128,8 +131,10 @@ export function useTerminal(
 
     return () => {
       disposed = true
-      el.removeEventListener('touchstart', onTouchStart)
-      el.removeEventListener('touchmove', onTouchMove)
+      if (screen) {
+        screen.removeEventListener('touchstart', onTouchStart)
+        screen.removeEventListener('touchmove', onTouchMove)
+      }
       observer.disconnect()
       if (ws) ws.close()
       term.dispose()
